@@ -35,6 +35,7 @@ struct burst_info {
 
 struct radio_message *last_m = NULL;
 
+
 void diag_init(unsigned start_sid, unsigned start_cid, const char *gsmtap_target, char *filename, uint32_t appid)
 {
 	int callback_type;
@@ -549,6 +550,7 @@ void handle_diag(uint8_t *msg, unsigned len)
 {
 	struct diag_packet *dp = (struct diag_packet *) msg;
 	struct radio_message *m = NULL;
+	static int diag_ok_message_showed = 0;
 
 	if (dp->msg_class != 0x0010) {
 		if (dp->msg_class == 0x001d && len > 9) {
@@ -559,6 +561,12 @@ void handle_diag(uint8_t *msg, unsigned len)
 			fprintf(stderr, "Class %04x is not supported\n", dp->msg_class);
 		}
 		return;
+	}
+	
+	if(!diag_ok_message_showed){
+	   //some messages were received, so diag device is OK
+	   printf("DIAG_OK\n");
+	   diag_ok_message_showed=1;
 	}
 
 	/* Avoid short messages */

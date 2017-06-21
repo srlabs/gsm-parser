@@ -14,6 +14,7 @@
 
 #ifdef USE_PCAP
 
+
 /* Pcap packet header */
 struct trace_pkthdr
 {
@@ -78,7 +79,7 @@ void trace_dump(trace_pkthdr_t *header, char *packet)
 
 	/* Write header */
 	timestamp[0] = header->ts.tv_sec;
-	timestamp[1] = 0;
+	timestamp[1] = header->ts.tv_usec; // write the microseconds as well
 
 	rc = fwrite(timestamp,sizeof(timestamp),1,pcap_handle);
 	assert(rc == 1);
@@ -133,12 +134,21 @@ static int trace_push_payload(unsigned char *payload_data, int payload_len, stru
 
 	/* Create pcap header */
 	assert(payload_len + gsmtap_offset <= 65535);
-	if(timestamp) {
-		memmove(&pcap_pkthdr.ts,timestamp,sizeof(*timestamp));
-	} else {
-		pcap_pkthdr.ts.tv_sec = 0;
-		pcap_pkthdr.ts.tv_usec = 0;
+	
+	/* Add timestamp */
+	if(auto_timestamp){
+		/* Fresh timestamp for PCAP header of every packet (when TARGET==android)*/
+    		gettimeofday(&pcap_pkthdr.ts, NULL);
+	}else{
+		/* Use provided timestamp (when TARGET==host)*/
+		if(timestamp) {
+			memmove(&pcap_pkthdr.ts,timestamp,sizeof(*timestamp));
+		} else {
+			pcap_pkthdr.ts.tv_sec = 0;
+			pcap_pkthdr.ts.tv_usec = 0;
+		}
 	}
+
 	pcap_pkthdr.len = payload_len + gsmtap_offset;
 	pcap_pkthdr.caplen = payload_len + gsmtap_offset;
 
