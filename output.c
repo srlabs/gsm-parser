@@ -356,7 +356,7 @@ void net_send_msg(struct radio_message *m)
 		break;
 	case RAT_LTE:
 		if (m->flags & MSG_SDCCH) {
-			msgb = gsmtap_makemsg_ex(0x0e, m->bb.arfcn[0], 0,
+			msgb = gsmtap_makemsg_ex(0x12, m->bb.arfcn[0], 0,
 					 0, 0, 0, 0, 0, m->bb.data, m->msg_len);
 		} else if (m->flags & MSG_BCCH) {
 			msgb = gsmtap_makemsg_ex(0x0d, m->bb.arfcn[0], 0,
