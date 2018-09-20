@@ -14,7 +14,7 @@ typedef struct
 	uint16_t mme_group_id;
 	uint8_t mme_code;
 	uint8_t identity_len;
-	uint8_t identity[255]; /* GUTI, IMEI, or IMSI */ 
+	uint8_t identity[255]; /* GUTI, IMEI, or IMSI */
 } eps_mobile_identity_t;
 
 /* Three different EPS MI types are possible: */
@@ -41,7 +41,7 @@ int parse_naseps_mi(naseps_msg_string_t *elm, eps_mobile_identity_t *mi)
 	/* EPS mobile identity information element for type of identity "GUTI" */
 	if(mi->type_of_identity == EPS_MI_TYPE_GUTI)
 	{
-		/* See also: 3GPP TS 24.301 version 12.7.0 Release 12, ETSI TS 124 301 V12.7.0 (2015-01), page 278 
+		/* See also: 3GPP TS 24.301 version 12.7.0 Release 12, ETSI TS 124 301 V12.7.0 (2015-01), page 278
 		             Figure 9.9.3.12.1: EPS mobile identity information element for type of identity "GUTI" */
 
 		/* Extract MCC/MNC fields */
@@ -64,20 +64,20 @@ int parse_naseps_mi(naseps_msg_string_t *elm, eps_mobile_identity_t *mi)
 	/* EPS mobile identity information element for type of identity "IMSI" or "IMEI" */
 	else if((mi->type_of_identity == EPS_MI_TYPE_IMSI)||(mi->type_of_identity == EPS_MI_TYPE_IMEI))
 	{
-		/* See also: 3GPP TS 24.301 version 12.7.0 Release 12, ETSI TS 124 301 V12.7.0 (2015-01), page 278 
+		/* See also: 3GPP TS 24.301 version 12.7.0 Release 12, ETSI TS 124 301 V12.7.0 (2015-01), page 278
 		             Figure 9.9.3.12.2: EPS mobile identity information element for type of identity "IMSI" or "IMEI" */
 
 		/* Note: Caller functions will expect a BCD encoded string where the length is set to the real
 			 buffer length (6 digits, buffer length = 3) see also handle_mi() from l3_handler.c */
 		return -1;
 	}
-	
+
 	return -1;
 }
 
 /* Handle EPS Mobile identity */
 void handle_eps_mi(struct session_info *s, naseps_msg_string_t *elm, uint8_t new_tmsi)
-{	
+{
 	/* Note: The new_tmsi flag is usually only set on an accept transaction,
 		 on all other transactions the flag is not set. */
 
@@ -98,7 +98,7 @@ void handle_eps_mi(struct session_info *s, naseps_msg_string_t *elm, uint8_t new
 				hex_bin2str(mi.identity, tmsi_str, 4);
 				tmsi_str[8] = 0;
 				assert(s->new_msg);
-				APPEND_MSG_INFO(s, ", TMSI %s", tmsi_str); 
+				APPEND_MSG_INFO(s, ", TMSI %s", tmsi_str);
 
 				if (new_tmsi) {
 					if (!not_zero(s->new_tmsi, 4)) {
@@ -150,10 +150,12 @@ void parse_naseps_lai(struct session_info *s, naseps_msg_t *msg, uint8_t new_lai
 		s->mcc = get_mcc(lai->digits);
 		s->mnc = get_mnc(lai->digits);
 		s->lac = htons(lai->lac);
+		APPEND_MSG_INFO(s, ", LAI %d-%d-%04x", s->mcc, s->mnc, s->lac);
 	} else {
 		s->lu_mcc = get_mcc(lai->digits);
 		s->lu_mnc = get_mnc(lai->digits);
 		s->lu_lac = htons(lai->lac);
+		APPEND_MSG_INFO(s, ", LAI %d-%d-%04x", s->lu_mcc, s->lu_mnc, s->lu_lac);
 	}
 }
 
@@ -174,7 +176,7 @@ void parse_naseps_nfs(struct session_info *s, naseps_msg_t *msg)
 		return;
 
 	/* Mask the IMS flag (last bit in the first octet) */
-	s->have_ims = elm->data[0] & 1; 
+	s->have_ims = elm->data[0] & 1;
 }
 
 
@@ -366,11 +368,11 @@ static void naseps_set_msg_info_mm(struct session_info *s, naseps_msg_t *msg)
 
 
 	switch (msg->subtype) {
-	case EPS_MM_ARQ_MSG: 	
+	case EPS_MM_ARQ_MSG:
 		SET_MSG_INFO(s, "ATTACH REQUEST");
 		handle_arq(s,msg);
 	break;
-	case EPS_MM_AAC_MSG: 	
+	case EPS_MM_AAC_MSG:
 		SET_MSG_INFO(s, "ATTACH ACCEPT");
 		handle_aac(s,msg);
 	break;
@@ -381,12 +383,12 @@ static void naseps_set_msg_info_mm(struct session_info *s, naseps_msg_t *msg)
 		handle_drq(s,msg);
 	break;
 	case EPS_MM_DAC_MSG: 	SET_MSG_INFO(s, "DETACH ACCEPT"); break;
-	case EPS_MM_TAUR_MSG: 	
-		SET_MSG_INFO(s, "TRACKING AREA UPDATE REQUEST"); 
+	case EPS_MM_TAUR_MSG:
+		SET_MSG_INFO(s, "TRACKING AREA UPDATE REQUEST");
 		handle_taur(s,msg);
 	break;
 	case EPS_MM_TAUA_MSG:
-		SET_MSG_INFO(s, "TRACKING AREA UPDATE ACCEPT"); 
+		SET_MSG_INFO(s, "TRACKING AREA UPDATE ACCEPT");
 		handle_taua(s,msg);
 	break;
 	case EPS_MM_TAUC_MSG: 	SET_MSG_INFO(s, "TRACKING AREA UPDATE COMPLETE"); break;
@@ -394,7 +396,10 @@ static void naseps_set_msg_info_mm(struct session_info *s, naseps_msg_t *msg)
 		SET_MSG_INFO(s, "TRACKING AREA UPDATE REJECT");
 		handle_tauj(s,msg);
 	break;
-	case EPS_MM_ESR_MSG: 	SET_MSG_INFO(s, "EXTENDED SERVICE REQUEST"); break;
+	case EPS_MM_ESR_MSG:
+		SET_MSG_INFO(s, "EXTENDED SERVICE REQUEST");
+		session_reset(s, 1);
+	break;
 	case EPS_MM_SR_MSG: 	SET_MSG_INFO(s, "SERVICE REJECT"); break;
 	case EPS_MM_GRAC_MSG: 	SET_MSG_INFO(s, "GUTI REALLOCATION COMMAND"); break;
 	case EPS_MM_GRAP_MSG: 	SET_MSG_INFO(s, "GUTI REALLOCATION COMPLETE"); break;
@@ -438,10 +443,10 @@ void naseps_set_msg_info(struct session_info *s, naseps_msg_t *msg)
 {
 	switch (msg->type)
 	{
-		case PROTOCOL_EPS_MM: 
+		case PROTOCOL_EPS_MM:
 			naseps_set_msg_info_mm(s, msg);
 			break;
-		case PROTOCOL_EPS_SM: 
+		case PROTOCOL_EPS_SM:
 			naseps_set_msg_info_sm(s, msg);
 			break;
 		default:

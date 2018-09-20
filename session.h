@@ -163,7 +163,7 @@ struct session_info {
 	int output_gsmtap;
 } __attribute__((packed));
 
-inline void link_to_msg_list(struct session_info* s, struct radio_message *m);
+void link_to_msg_list(struct session_info* s, struct radio_message *m);
 
 #define CALLBACK_NONE 0
 #define CALLBACK_MYSQL 1

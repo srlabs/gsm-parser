@@ -64,14 +64,14 @@ void handle_mi(struct session_info *s, uint8_t *data, uint8_t len, uint8_t new_t
 
 	case GSM_MI_TYPE_IMSI:
 		bcd2str(data, s->imsi, len*2, 1);
-		APPEND_MSG_INFO(s, ", IMSI %s", s->imsi); 
+		APPEND_MSG_INFO(s, ", IMSI %s", s->imsi);
 		s->use_imsi = 1;
 		break;
 
 	case GSM_MI_TYPE_IMEI:
 	case GSM_MI_TYPE_IMEISV:
 		bcd2str(data, s->imei, 15, 1);
-		APPEND_MSG_INFO(s, ", IMEI %s", s->imei); 
+		APPEND_MSG_INFO(s, ", IMEI %s", s->imei);
 		break;
 
 	case GSM_MI_TYPE_TMSI:
@@ -79,7 +79,7 @@ void handle_mi(struct session_info *s, uint8_t *data, uint8_t len, uint8_t new_t
 		tmsi_str[8] = 0;
 		assert(s->new_msg);
 
-		APPEND_MSG_INFO(s, ", TMSI %s", tmsi_str); 
+		APPEND_MSG_INFO(s, ", TMSI %s", tmsi_str);
 		if (new_tmsi) {
 			if (!not_zero(s->new_tmsi, 4)) {
 				memcpy(s->new_tmsi, &data[1], 4);
@@ -160,11 +160,15 @@ void handle_pag_resp(struct session_info *s, uint8_t *data)
 
 void handle_loc_upd_acc(struct session_info *s, uint8_t *data, unsigned len)
 {
+	SET_MSG_INFO(s, "LOC UPD ACCEPT");
+
 	s->locupd = 1;
 	s->mo = 1;
 	s->lu_acc = 1;
 
 	handle_lai(s, data, -1);
+
+	APPEND_MSG_INFO(s, ", LAC %d", s->lac);
 
 	if ((len > 11) && (data[5] == 0x17)) {
 		s->tmsi_realloc = 1;
@@ -184,13 +188,23 @@ void handle_id_req(struct session_info *s, uint8_t *data)
 		}
 		break;
 	case GSM_MI_TYPE_IMEI:
-	case GSM_MI_TYPE_IMEISV:
 		SET_MSG_INFO(s, "IDENTITY REQUEST, IMEI");
 		if (s->cipher) {
 			s->iden_imei_ac = 1;
 		} else {
 			s->iden_imei_bc = 1;
 		}
+		break;
+	case GSM_MI_TYPE_IMEISV:
+		SET_MSG_INFO(s, "IDENTITY REQUEST, IMEISV");
+		if (s->cipher) {
+			s->iden_imei_ac = 1;
+		} else {
+			s->iden_imei_bc = 1;
+		}
+		break;
+	case GSM_MI_TYPE_TMSI:
+		SET_MSG_INFO(s, "IDENTITY REQUEST, TMSI");
 		break;
 	}
 }
@@ -215,6 +229,8 @@ void handle_id_resp(struct session_info *s, uint8_t *data, unsigned len)
 			s->iden_imei_bc = 1;
 		}
 		break;
+	case GSM_MI_TYPE_TMSI:
+		break;
 	}
 
 	handle_mi(s, &data[1], data[0], 0);
@@ -234,6 +250,7 @@ void handle_loc_upd_req(struct session_info *s, uint8_t *data)
 	s->lu_mcc = get_mcc(lu->lai.digits);
 	s->lu_mnc = get_mnc(lu->lai.digits);
 	s->lu_lac = htons(lu->lai.lac);
+	APPEND_MSG_INFO(s, ", LAI %d-%d-%04x", s->lu_mcc, s->lu_mnc, s->lu_lac);
 
 	handle_classmark(s, (uint8_t *) &lu->classmark1, 1);
 
@@ -465,7 +482,6 @@ void handle_rr(struct session_info *s, struct gsm48_hdr *dtap, unsigned len, uin
 	struct gsm48_system_information_type_6 *si6;
 	struct tlv_parsed tp;
 
-	s->rat = RAT_GSM;
 	assert(s->new_msg);
 
 	if (!len) {
@@ -538,6 +554,7 @@ void handle_rr(struct session_info *s, struct gsm48_hdr *dtap, unsigned len, uin
 			s->have_gprs = 1;
 
 		session_reset(&s[0], 0);
+		s->rat = RAT_GSM;
 		if (auto_reset) {
 			s[1].new_msg = NULL;
 		}
@@ -554,11 +571,11 @@ void handle_rr(struct session_info *s, struct gsm48_hdr *dtap, unsigned len, uin
 		break;
 	case GSM48_MT_RR_PAG_REQ_1:
 		SET_MSG_INFO(s, "PAGING REQ 1");
-		handle_paging1(dtap, len);
+		handle_paging1((uint8_t *) dtap, len);
 		break;
 	case GSM48_MT_RR_PAG_REQ_2:
 		SET_MSG_INFO(s, "PAGING REQ 2");
-		handle_paging2(dtap, len);
+		handle_paging2((uint8_t *) dtap, len);
 		break;
 	case GSM48_MT_RR_PAG_REQ_3:
 		SET_MSG_INFO(s, "PAGING REQ 3");
@@ -575,6 +592,7 @@ void handle_rr(struct session_info *s, struct gsm48_hdr *dtap, unsigned len, uin
 		break;
 	case GSM48_MT_RR_PAG_RESP:
 		session_reset(s, 1);
+		s->rat = RAT_GSM;
 		SET_MSG_INFO(s, "PAGING RESPONSE");
 		handle_pag_resp(s, dtap->data);
 		break;
@@ -670,6 +688,7 @@ void handle_rr(struct session_info *s, struct gsm48_hdr *dtap, unsigned len, uin
 		SET_MSG_INFO(s, "UNKNOWN RR (%02x)", dtap->msg_type);
 		s->unknown = 1;
 	}
+	s->rat = RAT_GSM;
 }
 
 void handle_ss(struct session_info *s, struct gsm48_hdr *dtap, unsigned len)
@@ -804,6 +823,7 @@ void handle_gmm(struct session_info *s, struct gsm48_hdr *dtap, unsigned len)
 		break;
 	case 0x04:
 		SET_MSG_INFO(s, "ATTACH REJECT");
+		s->att_acc = -1;
 		break;
 	case 0x05:
 		SET_MSG_INFO(s, "DETACH REQUEST");
@@ -831,6 +851,7 @@ void handle_gmm(struct session_info *s, struct gsm48_hdr *dtap, unsigned len)
 		break;
 	case 0x0b:
 		SET_MSG_INFO(s, "RA UPDATE REJECT");
+		s->raupd = -1;
 		break;
 	case 0x0c:
 		session_reset(s, 1);
@@ -839,20 +860,27 @@ void handle_gmm(struct session_info *s, struct gsm48_hdr *dtap, unsigned len)
 		break;
 	case 0x0d:
 		SET_MSG_INFO(s, "SERVICE ACCEPT");
+		s->serv_req = 2;
 		break;
 	case 0x0e:
 		SET_MSG_INFO(s, "SERVICE REJECT");
+		s->serv_req = -1;
 		break;
 	case 0x10:
 		SET_MSG_INFO(s, "PTMSI REALLOC COMMAND");
+		s->tmsi_realloc = 1;
 		break;
 	case 0x11:
 		SET_MSG_INFO(s, "PTMSI REALLOC COMPLETE");
+		s->tmsi_realloc = 1;
 		break;
 	case 0x12:
 		SET_MSG_INFO(s, "AUTH AND CIPHER REQUEST");
 		if (!s->cipher) {
 			s->cipher = dtap->data[0] & 7;
+		}
+		if (s->rat == RAT_GSM) {
+			APPEND_MSG_INFO(s, ", GEA/%d", s->cipher);
 		}
 		s->cmc_imeisv = !!(dtap->data[0] & 0x70);
 		if ((len > (2 + 20)) && (dtap->data[20] == 0x28)) {
@@ -873,8 +901,8 @@ void handle_gmm(struct session_info *s, struct gsm48_hdr *dtap, unsigned len)
 		}
 		break;
 	case 0x14:
-		s->auth = 1;
 		SET_MSG_INFO(s, "AUTH AND CIPHER REJECT");
+		s->auth = 1;
 		break;
 	case 0x15:
 		handle_id_req(s, dtap->data);
@@ -1297,7 +1325,7 @@ void handle_lapdm(struct session_info *s, struct lapdm_buf *mb_sapi, uint8_t *ms
 
 	/* discard null frames */
 	if (!data_len) {
-		SET_MSG_INFO(s, "<NULL>"); 
+		SET_MSG_INFO(s, "<NULL>");
 		return;
 	}
 
@@ -1444,6 +1472,11 @@ void handle_radio_msg(struct session_info *s, struct radio_message *m)
 		break;
 
 	case RAT_UMTS:
+
+		// if an LTE transaction was not closed
+		if (s[0].rat == RAT_LTE && s[1].started == 1) {
+			session_reset(s, 1);
+		}
 		if (m->flags & MSG_SDCCH) {
 			s[0].rat = RAT_UMTS;
 			s[1].rat = RAT_UMTS;
@@ -1474,9 +1507,16 @@ void handle_radio_msg(struct session_info *s, struct radio_message *m)
 		break;
 
 	case RAT_LTE:
+		/* LTE NAS/EPS */
 		if (m->flags & MSG_SDCCH) {
 			s[0].rat = RAT_LTE;
 			s[1].rat = RAT_LTE;
+			/* Correct msg length for uplink */
+			if (ul && m->msg_len > 6) {
+				if (!not_zero(&m->bb.data[m->msg_len-6], 6)) {
+					m->msg_len -= 6;
+				}
+			}
 			handle_naseps(s, m->bb.data, m->msg_len);
 		}
 		if (msg_verbose && s->new_msg == m && m->flags & MSG_DECODED) {
@@ -1552,7 +1592,7 @@ unsigned encapsulate_lapdm(uint8_t *data, unsigned len, uint8_t ul, uint8_t sacc
 
 	/* Add default padding */
 	if (len + offset < alloc_len) {
-		memset(&lapdm[len + offset], 0x2b, alloc_len - (len + offset)); 
+		memset(&lapdm[len + offset], 0x2b, alloc_len - (len + offset));
 	}
 
 	return alloc_len;

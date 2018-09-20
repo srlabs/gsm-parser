@@ -63,9 +63,11 @@ int handle_dcch_ul(struct session_info *s, uint8_t *msg, size_t len)
 	case (UL_DCCH_MessageType_PR_rrcConnectionReleaseComplete-1):
 		SET_MSG_INFO(s, "RRC Release Complete");
 		s[0].release = 1;
+		s[0].rat = RAT_UMTS;
 		session_reset(&s[0], 0);
 		s[1].new_msg = NULL;
 		s[1].release = 1;
+		s[1].rat = RAT_UMTS;
 		session_reset(&s[1], 0);
 		break;
 
@@ -206,14 +208,18 @@ int handle_dcch_dl(struct session_info *s, uint8_t *msg, size_t len)
 		case (DL_DCCH_MessageType_PR_rrcConnectionRelease-1):
 			SET_MSG_INFO(s, "RRC Connection Release");
 			s[0].release = 1;
+			s[0].rat = RAT_UMTS;
 			session_reset(&s[0], 0);
 			s[1].new_msg = NULL;
 			s[1].release = 1;
+			s[1].rat = RAT_UMTS;
 			session_reset(&s[1], 0);
 			break;
 
 		case (DL_DCCH_MessageType_PR_securityModeCommand-1):
 			need_to_parse = 1;
+			s[0].rat = RAT_UMTS;
+			s[1].rat = RAT_UMTS;
 			break;
 
 		case (DL_DCCH_MessageType_PR_downlinkDirectTransfer-1):

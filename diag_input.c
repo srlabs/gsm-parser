@@ -35,7 +35,6 @@ struct burst_info {
 
 struct radio_message *last_m = NULL;
 
-
 void diag_init(unsigned start_sid, unsigned start_cid, const char *gsmtap_target, char *filename, uint32_t appid)
 {
 	int callback_type;
@@ -381,6 +380,7 @@ void handle_gsm_l1_surround_cell_ba_list(struct diag_packet *dp, unsigned len)
 {
 	struct gsm_l1_surround_cell_ba_list *cl = (struct gsm_l1_surround_cell_ba_list *)&dp->msg_type;
 	struct surrounding_cell *sc = cl->surr_cells;
+	int i;
 
 	if (len-16-2 != sizeof(struct surrounding_cell)*cl->cell_count + 1) {
 		if (msg_verbose > 1) {
@@ -389,17 +389,21 @@ void handle_gsm_l1_surround_cell_ba_list(struct diag_packet *dp, unsigned len)
 		return;
 	}
 
-	if (msg_verbose > 1) {
-		int i;
-
-		for (i = 0; i < cl->cell_count; i++) {
-			uint8_t band = get_band_from_arfcn_and_band(ntohs(sc[i].bcch_arfcn_and_band));
-			if (band == 8 || band == 9) {
+	for (i = 0; i < cl->cell_count; i++) {
+		uint8_t band = get_band_from_arfcn_and_band(ntohs(sc[i].bcch_arfcn_and_band));
+		if (band == 8 || band == 9) {
+			if (msg_verbose > 1) {
 				printf("arfcn neighbor %u %d %u\n",
 					get_arfcn_from_arfcn_and_band(ntohs(sc[i].bcch_arfcn_and_band)),
 					sc[i].rx_power,
-					sc[i].frame_number_offset
-				);
+					sc[i].frame_number_offset);
+			}
+
+			/* Set BSIC in cell_info list */
+			if (sc[i].bsic_known) {
+				set_bsic(get_epoch(&dp->timestamp),
+					 get_arfcn_from_arfcn_and_band(ntohs(sc[i].bcch_arfcn_and_band)),
+					 sc[i].bsic_this.ncc << 3 | sc[i].bsic_this.bcc);
 			}
 		}
 	}

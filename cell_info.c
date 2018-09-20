@@ -47,6 +47,7 @@ static unsigned output_sqlite = 1;
 static uint32_t previous_ts = 0;
 static struct session_info s;
 unsigned paging_count[3];
+unsigned paging_imei;
 unsigned paging_imsi;
 unsigned paging_tmsi;
 unsigned paging_null;
@@ -88,6 +89,7 @@ struct cell_info {
 	uint16_t bcch_arfcn;
 	int c1;
 	int c2;
+	int bsic;
 	uint32_t power_sum;
 	uint32_t power_count;
 	/* SI3 */
@@ -121,7 +123,8 @@ void paging_reset()
 	paging_count[0] = 0;
 	paging_count[1] = 0;
 	paging_count[2] = 0;
-	paging_imsi = 0;
+	paging_imei = 0;
+	paging_tmsi = 0;
 	paging_tmsi = 0;
 }
 
@@ -375,6 +378,33 @@ struct cell_info * get_from_arfcn(struct session_info *s, uint8_t msg_type)
 	}
 
 	return 0;
+}
+
+void set_bsic(uint32_t tv_sec, uint16_t arfcn, uint8_t bsic)
+{
+	struct cell_info *ci = NULL;
+
+//	printf("Matching BSIC %d for ARFCN %d @ %u\n", bsic, arfcn, tv_sec);
+
+	llist_for_each_entry_reverse(ci, &cell_list, entry) {
+		/* Match ARFCN */
+		if (ci->bcch_arfcn != arfcn) {
+			continue;
+		}
+		/* Make sure we have a cell ID */
+		if (! (ci->si_counter[SI3] || ci->si_counter[SI6])) {
+			continue;
+		}
+		/* and last timestamp not older than 1 minute */
+		if (ci->last_seen.tv_sec + 60 < tv_sec) {
+			continue;
+		}
+		/* if not already set */
+		if (ci->bsic < 0) {
+//			printf("Setting BSIC %d for ARFCN %d\n", bsic, arfcn);
+			ci->bsic = bsic;
+		}
+	}
 }
 
 struct cell_info * get_from_si(uint8_t msg_type, uint8_t *data, uint8_t len)
@@ -644,6 +674,7 @@ void handle_sysinfo(struct session_info *s, struct gsm48_hdr *dtap, unsigned len
 		}
 		ci = (struct cell_info *) malloc(sizeof(struct cell_info));
 		memset(ci, 0, sizeof(*ci));
+		ci->bsic = -1;
 		ci->bcch_arfcn = single_arfcn(s->new_msg);
 	}
 
@@ -841,6 +872,10 @@ void paging_inc(int pag_type, uint8_t mi_type)
 	case GSM_MI_TYPE_IMSI:
 		paging_imsi++;
 		break;
+	case GSM_MI_TYPE_IMEI:
+	case GSM_MI_TYPE_IMEISV:
+		paging_imei++;
+		break;
 	case GSM_MI_TYPE_TMSI:
 		paging_tmsi++;
 		break;
@@ -945,7 +980,7 @@ void arfcn_list_make_sql(struct cell_info *ci, enum si_index index, char *query,
 	for (i = 0; i < 1024; i++) {
 		if (ci->arfcn_list[i].mask & mask) {
 			offset = strlen(query);
-			snprintf(&query[offset], len-offset, "(%d,'%s',%d),", ci->id, si_name[index], i); 
+			snprintf(&query[offset], len-offset, "(%d,'%s',%d),", ci->id, si_name[index], i);
 		}
 	}
 
