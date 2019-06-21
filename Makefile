@@ -112,6 +112,7 @@ CFLAGS  += -DUSE_PCAP
 endif
 
 CFLAGS  += $(EXTRA_CFLAGS)
+LDFLAGS += $(EXTRA_LDFLAGS)
 
 %.o: %.c %.h
 	$(CC) -c -o $@ $< $(CFLAGS)
@@ -136,8 +137,9 @@ sm_3g.sql: doc/sm_3G_0.9.sql
 libmetagsm.so: $(OBJ)
 	$(CC) -o $@ $^ -shared -fPIC $(LDFLAGS)
 
+# Use $EXTRA_LDFLAGS here since $LDFLAGS already contains libcompat.so
 libcompat.so: compat.o
-	$(CC) -o $@ $^ -shared -fPIC --sysroot $(SYSROOT) -lc
+	$(CC) -o $@ $^ -shared -fPIC --sysroot $(SYSROOT) $(EXTRA_LDFLAGS) -lc
 
 libmetagsm.a: $(OBJ)
 	$(AR) rcs $@ $^
